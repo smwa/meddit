@@ -1,0 +1,15 @@
+pull:
+  stage: build
+  script:
+    - docker pull python:3.7
+
+destroy:
+  stage: build
+  script:
+    - docker stop meddit && docker rm meddit || true
+
+start:
+  stage: deploy
+  script:
+    - docker build -t smwa/meddit .
+    - docker run -d --restart=always --name meddit smwa/meddit
