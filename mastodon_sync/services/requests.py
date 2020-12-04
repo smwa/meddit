@@ -7,6 +7,18 @@ from base64 import b64encode
 from mastodon_sync.models import Account
 
 _mastodonHandles = {}
+_mainMastodonHandle = None
+
+
+directory = "tokens"
+if not path.exists(directory):
+    mkdir(directory)
+tokenPath = path.join(directory, '{}.token'.format(settings.MASTODON['USERNAME']))
+Mastodon.create_app(
+     'meddit',
+     api_base_url = settings.MASTODON['BASE_URL'],
+     to_file = tokenPath
+)
 
 
 def post(account, body, isNsfw):
@@ -19,31 +31,34 @@ def postToMainAccount(body, isNsfw):
 
 
 def _getMastodonHandle(account):
+    global _mastodonHandles
     username = account.username
     if username not in _mastodonHandles:
         _mastodonHandles[username] = _createSession(account)
-    mastodon = _mastodonHandles[username]
-    return mastodon
+    directory = "tokens"
+    if not path.exists(directory):
+        mkdir(directory)
+    tokenPath = path.join(directory, '{}.token'.format(username))
+    _mastodonHandles[username] = Mastodon(access_token=tokenPath, api_base_url=settings.MASTODON['BASE_URL'])
+    return _mastodonHandles[username]
 
 
 def _getMainMastodonHandle():
+    global _mainMastodonHandle
     directory = "tokens"
     if not path.exists(directory):
         mkdir(directory)
     tokenPath = path.join(directory, '{}.token'.format(settings.MASTODON['USERNAME']))
-    if not path.exists(tokenPath):
-        mastodon = Mastodon(client_id=settings.MASTODON['CLIENT_ID'],
+    if _mainMastodonHandle is None:
+        _mainMastodonHandle = Mastodon(client_id=settings.MASTODON['CLIENT_ID'],
                             client_secret=settings.MASTODON['CLIENT_SECRET'],
                             api_base_url=settings.MASTODON['BASE_URL'])
-        mastodon.log_in(username=settings.MASTODON['EMAIL'],
+        _mainMastodonHandle.log_in(settings.MASTODON['EMAIL'],
                         password=settings.MASTODON['PASSWORD'],
                         scopes=['read', 'write'],
                         to_file=tokenPath)
-    mastodon = Mastodon(
-        access_token=tokenPath,
-        api_base_url=settings.MASTODON['BASE_URL']
-    )
-    return mastodon
+    _mainMastodonHandle = Mastodon(access_token=tokenPath, api_base_url=settings.MASTODON['BASE_URL'])
+    return _mainMastodonHandle
 
 
 def _createSession(account):
@@ -51,21 +66,16 @@ def _createSession(account):
     if not path.exists(directory):
         mkdir(directory)
     tokenPath = path.join(directory, '{}.token'.format(account.username))
-    if not path.exists(tokenPath):
-        print("Creating token file for {}".format(account.username))
-        mastodon = Mastodon(client_id=settings.MASTODON['CLIENT_ID'],
-                            client_secret=settings.MASTODON['CLIENT_SECRET'],
-                            api_base_url=settings.MASTODON['BASE_URL'])
-        print(account.email)
-        print(account.password)
-        mastodon.log_in(username=account.email,
-                        password=account.password,
-                        scopes=['read', 'write'],
-                        to_file=tokenPath)
-    mastodon = Mastodon(
-        access_token=tokenPath,
-        api_base_url=settings.MASTODON['BASE_URL']
-    )
+    print("Creating token file for {}".format(account.username))
+    mastodon = Mastodon(client_id=settings.MASTODON['CLIENT_ID'],
+                        client_secret=settings.MASTODON['CLIENT_SECRET'],
+                        api_base_url=settings.MASTODON['BASE_URL'])
+    print(account.email)
+    print(account.password)
+    mastodon.log_in(account.email,
+                    password=account.password,
+                    scopes=['read', 'write'],
+                    to_file=tokenPath)
     return mastodon
 
 
@@ -101,6 +111,10 @@ def createAccount(username, isNsfw, subreddit):
         baseUrl = settings.MASTODON['BASE_URL'].replace("https://", "").replace("http://", "")
         postBody = "@{}@{} is now available to follow!".format(account.username, baseUrl)
         postToMainAccount(postBody, isNsfw)
+        mastodon = Mastodon(client_id=settings.MASTODON['CLIENT_ID'],
+                            client_secret=settings.MASTODON['CLIENT_SECRET'],
+                            api_base_url=settings.MASTODON['BASE_URL'])
+        mastodon.account_follow(account.username)
     except Exception as e:
         # Check if user already exists with the default password
         sessionHandle = _getMastodonHandle(account)

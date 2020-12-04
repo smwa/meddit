@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-python -u manage.py migrate
-python -u manage.py fetch &
-python -u manage.py sync
+python3 -u manage.py migrate
+python3 -u manage.py fetch &
+python3 -u manage.py sync

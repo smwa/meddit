@@ -24,11 +24,23 @@ class Command(BaseCommand):
           print("Subreddit is already added\n")
         except Subreddit.DoesNotExist:
           prawSubreddit = reddit.subreddit(subredditName)
-          if not prawSubreddit.description:
-            raise Exception("Subreddit has no description")
+          try:
+              print("Name: {}\nDescription: {}\nNSFW: {}".format(prawSubreddit.display_name, prawSubreddit.public_description, prawSubreddit.over18))
+          except Exception:
+            print("Subreddit {} does not exist".format(subredditName))
+            return
+          try:
+            doesExist = Subreddit.objects.get(name=prawSubreddit.display_name)
+            print("Subreddit is already added\n")
+            return
+          except Subreddit.DoesNotExist:
+            pass
+          if not prawSubreddit.public_description:
+            print("Subreddit has no description")
+            return
           sub = Subreddit()
           sub.name = prawSubreddit.display_name
-          sub.description = prawSubreddit.description
+          sub.description = prawSubreddit.public_description
           sub.nsfw = prawSubreddit.over18
           sub.save()
         for sub in Subreddit.objects.all():
